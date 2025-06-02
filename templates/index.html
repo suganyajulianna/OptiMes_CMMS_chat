@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Optimus Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        #chatbot-icon {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #007bff;
+            color: white;
+            font-size: 24px;
+            padding: 10px 12px;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 999;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+
+
+        #chatbot-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            max-height: 600px;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 1000;
+        }
+
+        #chat-header {
+            background-color: #007bff;
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        #chat-body {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            font-size: 14px;
+        }
+
+        .summary-line {
+            margin-bottom: 8px;
+        }
+
+        .question {
+            background-color: #f1f1f1;
+            padding: 6px 10px;
+            margin: 6px 0;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .answer {
+            display: none;
+            padding: 6px 10px;
+            margin-top: -5px;
+            background-color: #e8f0fe;
+            border-left: 3px solid #007bff;
+        }
+
+        #chat-footer {
+            display: flex;
+            border-top: 1px solid #ccc;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        #send-btn {
+            margin-left: 8px;
+            padding: 8px 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #send-btn:hover {
+            background-color: #0056b3;
+        }
+
+        #reset-machine-btn {
+            margin-left: 8px;
+            padding: 8px 12px;
+            background-color: #dc3545;
+            /* Bootstrap red */
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #reset-machine-btn:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="chatbot-container">
+        <div id="chat-header">OptiMES Chatbot</div>
+        <div id="chat-body">
+            <p>Enter Machine ID to get started:</p>
+            <input type="text" id="machine-id-input" placeholder="e.g., machine123"
+                style="width: 100%; padding: 6px; margin-bottom: 10px;" />
+            <button onclick="fetchManual()">Fetch Manual</button>
+            <div id="summary"></div>
+            <div id="questions"></div>
+            <hr>
+            <div id="custom-interaction"></div>
+        </div>
+        <div id="chat-footer">
+            <input type="text" id="user-input" placeholder="Ask a custom question..." />
+            <button id="send-btn" onclick="askCustomQuestion()">Ask</button>
+            <button id="reset-machine-btn" tabindex="0">Reset machine_id</button>
+        </div>
+    </div>
+
+    <script>
+        let fullManualText = "";
+
+        function fetchManual() {
+            const machineId = document.getElementById('machine-id-input').value;
+            if (!machineId) {
+                alert("Please enter a machine ID");
+                return;
+            }
+
+            fetch("/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ machine_id: machineId })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+
+                    fullManualText = data.manual_text;
+                    const summaryDiv = document.getElementById('summary');
+                    summaryDiv.innerHTML = "<h4>Summary:</h4>";
+                    data.summary.forEach(line => {
+                        summaryDiv.innerHTML += `<div class='summary-line'>• ${line}</div>`;
+                    });
+
+                    const questionsDiv = document.getElementById('questions');
+                    questionsDiv.innerHTML = "<h4>Click a Question:</h4>";
+                    data.questions.forEach(q => {
+                        const qDiv = document.createElement("div");
+                        qDiv.className = "question";
+                        qDiv.innerText = q;
+                        qDiv.onclick = () => askPreGeneratedQuestion(q, qDiv);
+                        questionsDiv.appendChild(qDiv);
+                    });
+
+                }).catch(err => {
+                    console.error(err);
+                    alert("Something went wrong while fetching manual.");
+                });
+        }
+
+        function askPreGeneratedQuestion(question, qDiv) {
+            fetch("/api/manual_qa", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ question: question, manual_text: fullManualText })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    const answerDiv = document.createElement("div");
+                    answerDiv.className = "answer";
+                    answerDiv.innerText = data.answer;
+                    qDiv.insertAdjacentElement('afterend', answerDiv);
+                    answerDiv.style.display = "block";
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Error fetching answer.");
+                });
+        }
+
+        function askCustomQuestion() {
+            const question = document.getElementById('user-input').value;
+            if (!question || !fullManualText) {
+                alert("Please enter a question and ensure manual is loaded.");
+                return;
+            }
+
+            fetch("/api/manual_qa", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ question: question, manual_text: fullManualText })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    const customDiv = document.getElementById("custom-interaction");
+                    customDiv.innerHTML += `
+                <div class="question">${question}</div>
+                <div class="answer" style="display: block;">${data.answer}</div>
+            `;
+                    document.getElementById('user-input').value = "";
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Error fetching custom answer.");
+                });
+        }
+        // Hide the chatbot initially
+        document.getElementById('chatbot-container').style.display = 'none';
+
+        function toggleChatbot() {
+            const container = document.getElementById('chatbot-container');
+            container.style.display = container.style.display === 'none' ? 'flex' : 'none';
+        }
+        // Trigger fetchManual when Enter is pressed in the machine-id input
+        document.getElementById('machine-id-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                fetchManual();
+            }
+        });
+        // Trigger askCustomQuestion when Enter is pressed in the user-input field
+        document.getElementById('user-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                askCustomQuestion();
+            }
+        });
+
+
+    </script>
+    <script>
+        const resetButton = document.getElementById("reset-machine-btn");
+
+        resetButton.addEventListener("click", function () {
+            fetch("/reset-machine", {
+                method: "POST"
+            })
+                .then(response => {
+                    if (response.ok) {
+                        alert("Machine state has been reset!");
+                        location.reload();
+                    } else {
+                        alert("Failed to reset machine state.");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    alert("Error occurred while resetting.");
+                });
+        });
+
+        resetButton.addEventListener("keypress", function (e) {
+            if (e.key === "Enter") {
+                resetButton.click();
+            }
+        });
+    </script>
+    <div id="chatbot-icon" onclick="toggleChatbot()">
+        💬
+    </div>
+</body>
+
+</html>

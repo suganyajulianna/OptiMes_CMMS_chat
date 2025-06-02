@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: optimus-flask-app
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python app_correct.py"
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
