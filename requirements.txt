@@ -72,7 +72,7 @@ threadpoolctl==3.6.0
 tokenizers==0.21.1
 torch==2.7.0
 torchaudio==2.7.0
-torchvision==0.22.0+cpu
+torchvision==0.22.0
 tqdm==4.67.1
 transformers==4.51.3
 typer==0.15.3
